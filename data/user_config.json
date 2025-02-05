@@ -1,0 +1,9 @@
+{
+    "gemini_api_key": "enter-api",
+    "app_paths": {
+        "music": "C:\\Users\\athar\\AppData\\Roaming\\Spotify\\Spotify.exe",
+        "news": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        "code": "C:\\Users\\athar\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
+        "play": "C:\\Program Files\\HoYoPlay\\launcher.exe"
+    }
+}

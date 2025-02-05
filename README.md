@@ -26,8 +26,8 @@ Welcome to the **AI Assistant** project! This application is designed to help us
 1. **Clone the repository:**
 
     ```bash
-    git clone https://your_github_repo/your_repo_name.git
-    cd your_repo_name
+    git clone https://github.com/ADIITJ/Alex-AI-Assisitant
+    cd Alex-AI-Assistant
     ```
 
 2. **Create a virtual environment:**
