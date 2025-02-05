@@ -54,9 +54,13 @@ class MainWindow(QWidget):
         # Set background image
         self.setAutoFillBackground(True)
         palette = self.palette()
-        background_image = QPixmap(str(Path("gui/assets/background.jpg")))
-        background_image = background_image.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
-        palette.setBrush(QPalette.ColorRole.Window, QBrush(background_image))
+        background_image_path = Path("gui/assets/background.png")
+        if background_image_path.exists():
+            background_image = QPixmap(str(background_image_path))
+            background_image = background_image.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
+            palette.setBrush(QPalette.ColorRole.Window, QBrush(background_image))
+        else:
+            self.logger.log(f"Background image not found at {background_image_path}", level="error")
         self.setPalette(palette)
 
         main_layout = QVBoxLayout()

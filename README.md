@@ -115,14 +115,12 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read the CONTRIBUTING guidelines first.
+Contributions are welcome!
 
 ## 📞 Contact
 
-For any inquiries or issues, please contact [your_email@example.com](mailto:atharva.a.date@gmail.com).
+For any inquiries or issues, please contact [atharva.a.date@gmail.com](mailto:atharva.a.date@gmail.com).
 
 ---
 
-*Made with ❤️ by [Your Name](https://github.com/ADIITJ)*
-
-![Footer Image](gui/assets/footer_image.png)
+*Made by [Atharva Date](https://github.com/ADIITJ)*
