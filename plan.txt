@@ -1,0 +1,951 @@
+Okay, this is an ambitious but achievable project! Let's break it down step by step. We'll structure the project, write the code, and identify dependencies. I'll provide a file structure and the essential code components, focusing on clarity.
+
+Project Goal: Create a voice-activated desktop assistant on Windows with file, application, and LLM capabilities, a chat window, and startup functionality.
+
+Core Technologies & Libraries:
+
+Python (>= 3.8): The primary language for the backend logic.
+
+SpeechRecognition: For handling voice input.
+
+pyttsx3: For text-to-speech output (optional).
+
+requests: For web requests (e.g., news, Gemini).
+
+gemini-pro: Accessing Google's Gemini API.
+
+Pillow: for image processing.
+
+PyQt6: For the graphical user interface (GUI).
+
+os/subprocess: For interacting with the OS (launching applications, files).
+
+shutil: For file system operations.
+
+time: For timing operations
+
+psutil: Getting System Resource Information
+
+pathlib: for working with files
+
+win10toast: For notifications and startup setup (optional, but nice to have).
+
+File Structure:
+
+ai_assistant/
+    ├── core/
+    │   ├── _init_.py
+    │   ├── speech_handler.py   # Handles voice input
+    │   ├── command_handler.py   # Processes commands
+    │   ├── gemini_handler.py   #  Interact with Google Gemini
+    │   ├── app_manager.py      #  File/App Handling logic
+    │   └── config.py         # load api keys and important configuration information
+    │
+    ├── gui/
+    │   ├── _init_.py
+    │   ├── main_window.py     # PyQt window setup
+    │   ├── style.py           # For window styles
+    │   └── assets/            # holds animations, or icons if required
+    │       └── animated_icon.gif
+    │
+    ├── utils/
+    │   ├── _init_.py
+    │   ├── startup.py         # Manages startup
+    │   ├── system.py          # System specific function for operating systems
+    │   └── logger.py          # Logging of Errors and events
+    ├── data/
+    │   └── user_config.json # stores important information
+    ├── requirements.txt      # Python dependencies
+    ├── main.py               # Main application entry point
+    └── README.md               # Markdown Readme file for application
+content_copy
+download
+Use code with caution.
+
+1. Project Setup:
+
+Create the Project Directory:
+
+mkdir ai_assistant
+cd ai_assistant
+content_copy
+download
+Use code with caution.
+Bash
+
+Create Sub-directories and Files: Create the file structure as described above (you can use your file explorer).
+
+Set Up a Virtual Environment (Recommended):
+
+python -m venv venv
+venv\Scripts\activate #On Windows
+content_copy
+download
+Use code with caution.
+Bash
+
+Install Dependencies:
+
+content_copy
+download
+Use code with caution.
+Bash
+
+pip install SpeechRecognition pyttsx3 requests google-generativeai pyqt6 Pillow win10toast psutil pathlib
+
+
+Create requirements.txt:
+
+pip freeze > requirements.txt
+content_copy
+download
+Use code with caution.
+Bash
+
+2. Code Implementation:
+
+ai_assistant/core/config.py
+
+import json
+import os
+from pathlib import Path
+
+class Config:
+    def __init__(self, config_file="data/user_config.json"):
+        self.config_file = Path(config_file)
+        self.data = self._load_config()
+        self.gemini_api_key = self.data.get("gemini_api_key")
+        self.app_paths = self.data.get("app_paths")
+
+    def _load_config(self):
+         if not os.path.exists(self.config_file):
+            print("Creating config file")
+            initial_data = {
+            "gemini_api_key": "Enter_API_Key",
+            "app_paths":{
+                    "music" : "Spotify.exe",
+                    "news": "brave.exe",
+                    "code": "code.exe"
+            }
+            }
+            with open(self.config_file, 'w') as f:
+                json.dump(initial_data, f, indent=4)
+            return initial_data
+         else:
+            try:
+               with open(self.config_file, 'r') as f:
+                   return json.load(f)
+            except Exception as e:
+              print("Error loading config file", e)
+              return {}
+
+
+    def save_config(self):
+        try:
+            with open(self.config_file, "w") as f:
+                json.dump(self.data, f, indent=4)
+        except Exception as e:
+            print(f"Failed to save configuration: {e}")
+
+
+    def add_app_path(self, app_name, app_path):
+       if self.app_paths is None:
+           self.app_paths = {}
+       self.app_paths[app_name] = app_path
+       self.data["app_paths"] = self.app_paths
+       self.save_config()
+
+    def get_app_path(self,app_name):
+         if self.app_paths and app_name in self.app_paths:
+           return self.app_paths.get(app_name)
+         return None
+
+    def update_gemini_key(self, gemini_api_key):
+        self.gemini_api_key = gemini_api_key
+        self.data["gemini_api_key"] = gemini_api_key
+        self.save_config()
+
+    def get_gemini_key(self):
+        return self.gemini_api_key
+
+    def update_data(self, key, value):
+        self.data[key] = value
+        self.save_config()
+
+    def get_data(self, key):
+        if key in self.data:
+            return self.data[key]
+        return None
+
+if __name__ == '__main__':
+    config = Config()
+    print(config.data)
+    config.add_app_path("my_app","c:/somePath/my_app.exe")
+    print(config.data)
+    print(config.get_app_path("music"))
+    print(config.get_gemini_key())
+    config.update_gemini_key("MyAPIKEY1234567890")
+    print(config.get_gemini_key())
+    print(config.get_data("testkey"))
+    config.update_data("testkey", "testvalue")
+    print(config.get_data("testkey"))
+content_copy
+download
+Use code with caution.
+Python
+
+ai_assistant/core/speech_handler.py
+
+import speech_recognition as sr
+from utils.logger import Logger
+
+class SpeechHandler:
+    def __init__(self, logger : Logger):
+       self.recognizer = sr.Recognizer()
+       self.logger = logger
+    def listen(self):
+        """Listens for voice input and returns the recognized text."""
+        with sr.Microphone() as source:
+            self.logger.log("Listening...")
+            self.recognizer.adjust_for_ambient_noise(source, duration=1)
+            try:
+              audio = self.recognizer.listen(source, timeout=5)
+            except sr.WaitTimeoutError:
+              self.logger.log("Listening timed out", level='error')
+              return "" # Handle Timeout
+        try:
+             text = self.recognizer.recognize_google(audio)
+             self.logger.log(f"You said: {text}")
+             return text
+        except sr.UnknownValueError:
+            self.logger.log("Could not understand audio", level='error')
+            return ""
+        except sr.RequestError as e:
+            self.logger.log(f"Error fetching recognition service; {e}", level='error')
+            return ""
+
+
+if __name__ == '__main__':
+    logger = Logger()
+    speech_handler = SpeechHandler(logger)
+    while True:
+      voice = speech_handler.listen()
+      if voice:
+         print("You Said: ", voice)
+content_copy
+download
+Use code with caution.
+Python
+
+ai_assistant/core/gemini_handler.py
+import google.generativeai as genai
+from core.config import Config
+from utils.logger import Logger
+
+class GeminiHandler:
+    def __init__(self, logger:Logger, config: Config):
+       self.logger = logger
+       self.config = config
+       self.api_key = self.config.get_gemini_key()
+       if not self.api_key or self.api_key == "Enter_API_Key":
+          self.logger.log("Please configure api key in the user_config.json", level="error")
+          exit()
+       genai.configure(api_key = self.api_key)
+       self.model = genai.GenerativeModel('gemini-pro')
+
+
+    def chat(self, prompt):
+      try:
+        response = self.model.generate_content(prompt)
+        if response and response.text:
+            self.logger.log(f"Gemini Response: {response.text}")
+            return response.text
+        else:
+            self.logger.log(f"Gemini did not return any response", level="error")
+            return None
+      except Exception as e:
+        self.logger.log(f"Error accessing gemini : {e}", level="error")
+        return None
+
+if __name__ == '__main__':
+  logger = Logger()
+  config = Config()
+  gemini_handler = GeminiHandler(logger, config)
+  while True:
+    prompt = input("Enter text for Gemimi or 'exit' to end: ")
+    if prompt.lower() == 'exit':
+        break
+    response = gemini_handler.chat(prompt)
+    if response:
+      print("Response: ", response)
+content_copy
+download
+Use code with caution.
+Python
+
+ai_assistant/core/app_manager.py
+
+import os
+import subprocess
+import webbrowser
+from utils.logger import Logger
+from pathlib import Path
+from core.config import Config
+
+class AppManager:
+    def __init__(self, logger:Logger, config: Config):
+      self.logger = logger
+      self.config = config
+      self.paths = self.config.app_paths
+
+    def open_file(self, file_path):
+        """Opens a file using the default application."""
+        try:
+            if not Path(file_path).exists():
+              self.logger.log(f"File {file_path} not found!", level="error")
+              return False
+            os.startfile(file_path)
+            self.logger.log(f"Opened file: {file_path}")
+            return True
+        except Exception as e:
+            self.logger.log(f"Error opening file: {e}", level='error')
+            return False
+
+    def open_folder(self, folder_path):
+        """Opens a folder in file explorer."""
+        try:
+            if not Path(folder_path).exists():
+                self.logger.log(f"File {folder_path} not found!", level="error")
+                return False
+            os.startfile(folder_path)
+            self.logger.log(f"Opened folder: {folder_path}")
+            return True
+        except Exception as e:
+            self.logger.log(f"Error opening folder: {e}", level='error')
+            return False
+
+    def open_app(self, app_name):
+        """Opens an application based on its name or a provided executable path."""
+        app_path = self.config.get_app_path(app_name)
+        if not app_path:
+          self.logger.log(f"Cannot locate {app_name}, please configure in user_config.json", level="error")
+          return False
+        try:
+            subprocess.Popen([app_path])
+            self.logger.log(f"Opened App: {app_name}")
+            return True
+        except Exception as e:
+            self.logger.log(f"Error opening application: {e}", level='error')
+            return False
+
+    def open_url(self, url):
+      try:
+            webbrowser.open(url)
+            self.logger.log(f"Opened Website: {url}")
+            return True
+      except Exception as e:
+            self.logger.log(f"Error opening website: {e}", level='error')
+            return False
+
+
+
+    def find_executable(self, app_name):
+         """This function searches all of your local drives and find executable files."""
+         try:
+             for drive_letter in [chr(i) + ":" for i in range(65, 91)]:  # A-Z Drives
+                app_path = self._search_directory(drive_letter + "/", app_name+".exe")
+                if app_path:
+                    return app_path
+         except Exception as e:
+             self.logger.log(f"Unable to search local drives {e}", level='error')
+             return None
+         return None
+    def _search_directory(self, dir_path, filename):
+        """Helper Function"""
+        try:
+          for root, dirs, files in os.walk(dir_path):
+              if filename in files:
+                  return os.path.join(root, filename)
+          return None
+        except Exception as e:
+            self.logger.log(f"Unable to search directory {dir_path} with error {e}", level="error")
+            return None
+
+
+
+if __name__ == '__main__':
+    logger = Logger()
+    config = Config()
+    app_manager = AppManager(logger, config)
+    app_manager.open_url("https://google.com")
+    app_manager.open_file(r"c:\users\Public\Documents\sample.txt")
+    app_manager.open_folder(r"c:\users\Public\Documents")
+    app_manager.open_app("code")
+    executable_path = app_manager.find_executable("notepad")
+    if executable_path:
+        print("Executable Path ", executable_path)
+content_copy
+download
+Use code with caution.
+Python
+
+ai_assistant/core/command_handler.py
+
+from core.app_manager import AppManager
+from core.gemini_handler import GeminiHandler
+from utils.logger import Logger
+
+class CommandHandler:
+    def __init__(self, logger:Logger, app_manager:AppManager, gemini_handler: GeminiHandler):
+        self.logger = logger
+        self.app_manager = app_manager
+        self.gemini_handler = gemini_handler
+        self.actions = {
+           "play music" :  self._play_music,
+           "play": self._play_music,
+           "whats going on" : self._whats_going_on,
+           "lets code": self._lets_code,
+        }
+
+    def process(self, command):
+        command = command.lower().strip()
+        self.logger.log(f"Command to Process: {command}")
+
+        if command.startswith("tell me"):
+            prompt = command.replace("tell me", "").strip()
+            return self.gemini_handler.chat(prompt)
+
+        for keyword, action in self.actions.items():
+            if keyword in command:
+              return action()
+
+        # Check if the command is for file, folder, or app
+        if "open" in command:
+             parts = command.split("open", 1)
+             if len(parts) > 1:
+                 target = parts[1].strip()
+                 self.logger.log(f"Checking open command with target: {target}")
+                 if ".exe" in target:
+                    if self.app_manager.open_app(target.replace(".exe", "")):
+                      return "Okay"
+                 if "." in target:
+                      if self.app_manager.open_file(target):
+                           return "Okay"
+                 else:
+                      if self.app_manager.open_folder(target):
+                         return "Okay"
+                      else:
+                         self.app_manager.open_app(target)
+                         return "Okay"
+
+        return f"I don't know what {command} means"
+
+
+
+    def _play_music(self):
+       if self.app_manager.open_app("music"):
+          return "Playing Music"
+       return "Unable to Open Music"
+
+    def _whats_going_on(self):
+        if self.app_manager.open_url("https://www.bbc.com/news"):
+           return "Opening BBC News"
+        return "Unable to open Website"
+    def _lets_code(self):
+        if self.app_manager.open_app("code"):
+          return "Opening Visual Studio Code"
+        return "Unable to open VSCode"
+
+if __name__ == '__main__':
+   logger = Logger()
+   from core.config import Config
+   config = Config()
+   app_manager = AppManager(logger, config)
+   gemini_handler = GeminiHandler(logger, config)
+   command_handler = CommandHandler(logger, app_manager, gemini_handler)
+   while True:
+      command = input("Enter command or exit to end: ")
+      if command.lower() == "exit":
+         break
+      response = command_handler.process(command)
+      if response:
+          print("Response: ", response)
+content_copy
+download
+Use code with caution.
+Python
+
+ai_assistant/utils/logger.py
+
+import datetime
+
+class Logger:
+    def __init__(self, log_file="assistant.log"):
+        self.log_file = log_file
+    def log(self, message, level='INFO'):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_message = f"[{timestamp}] [{level}] {message}\n"
+        with open(self.log_file, 'a') as f:
+          f.write(log_message)
+        print(log_message, end="")
+
+if __name__ == '__main__':
+    logger = Logger()
+    logger.log("This is an error message", level="error")
+    logger.log("This is a test message", level="info")
+content_copy
+download
+Use code with caution.
+Python
+
+ai_assistant/utils/startup.py
+
+import os
+import winreg
+import sys
+from pathlib import Path
+from utils.logger import Logger
+
+class StartupManager:
+    def __init__(self, app_path, logger:Logger):
+      self.app_path = app_path
+      self.logger = logger
+      self.registry_key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+
+    def is_startup_enabled(self):
+       """Checks if the application is set to run at startup."""
+       try:
+         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, self.registry_key)
+         value, _ = winreg.QueryValueEx(key, "ai_assistant")
+         winreg.CloseKey(key)
+         return Path(value) == Path(self.app_path)
+       except FileNotFoundError:
+         return False
+
+    def enable_startup(self):
+        """Sets the application to run at startup."""
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, self.registry_key, 0, winreg.KEY_SET_VALUE)
+            winreg.SetValueEx(key, "ai_assistant", 0, winreg.REG_SZ, str(self.app_path))
+            winreg.CloseKey(key)
+            self.logger.log("Startup enabled.")
+            return True
+        except Exception as e:
+           self.logger.log(f"Failed to set Startup: {e}", level="error")
+           return False
+
+    def disable_startup(self):
+      """Removes the application from running at startup."""
+      try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, self.registry_key, 0, winreg.KEY_ALL_ACCESS)
+        winreg.DeleteValue(key, "ai_assistant")
+        winreg.CloseKey(key)
+        self.logger.log("Startup disabled.")
+        return True
+      except FileNotFoundError:
+            self.logger.log("Startup entry not found, nothing to disable.", level="info")
+            return True
+      except Exception as e:
+            self.logger.log(f"Failed to disable Startup: {e}", level="error")
+            return False
+
+if __name__ == '__main__':
+    logger = Logger()
+    app_path = sys.executable
+    startup = StartupManager(app_path, logger)
+    if startup.is_startup_enabled():
+       print("Startup enabled.")
+    else:
+        print("Startup disabled.")
+    if startup.enable_startup():
+       print("Startup Enabled.")
+    else:
+        print("Startup failed")
+
+    if startup.disable_startup():
+      print("Startup Disabled.")
+    else:
+        print("Startup failed")
+    if startup.is_startup_enabled():
+       print("Startup enabled.")
+    else:
+        print("Startup disabled.")
+content_copy
+download
+Use code with caution.
+Python
+
+ai_assistant/utils/system.py
+
+import psutil
+import platform
+
+class SystemUtils:
+
+     def get_cpu_usage(self):
+        return psutil.cpu_percent(interval = 1) #Get CPU %
+
+     def get_memory_usage(self):
+         mem = psutil.virtual_memory()
+         return mem.percent # Get % used memory
+
+     def get_os_name(self):
+        return platform.system() #Get operating system
+
+
+if __name__ == '__main__':
+    system_utils = SystemUtils()
+    print("CPU %: ", system_utils.get_cpu_usage())
+    print("Memory %: ", system_utils.get_memory_usage())
+    print("OS: ", system_utils.get_os_name())
+content_copy
+download
+Use code with caution.
+Python
+
+ai_assistant/gui/style.py
+
+chat_style = """
+    QTextEdit {
+        background-color: #f0f0f0;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-size: 14px;
+        padding: 5px;
+    }
+
+    QTextEdit:focus {
+        border-color: #4a90e2;
+    }
+"""
+input_box_style = """
+    QLineEdit {
+        background-color: #ffffff;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        padding: 5px;
+        font-size: 14px;
+    }
+
+    QLineEdit:focus {
+        border-color: #4a90e2;
+    }
+
+"""
+content_copy
+download
+Use code with caution.
+Python
+
+ai_assistant/gui/main_window.py
+
+import sys
+import time
+from pathlib import Path
+from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout,
+                             QTextEdit, QLineEdit, QHBoxLayout, QLabel, QPushButton, QDialog, QScrollArea)
+from PyQt6.QtCore import Qt, QSize, QTimer
+from PyQt6.QtGui import QMovie, QIcon
+from gui.style import chat_style, input_box_style
+from core.speech_handler import SpeechHandler
+from core.command_handler import CommandHandler
+from utils.system import SystemUtils
+from utils.logger import Logger
+from core.config import Config
+
+
+class SettingsDialog(QDialog):
+    def __init__(self, config: Config, parent = None):
+         super().__init__(parent)
+         self.config = config
+         self.setWindowTitle("Settings")
+         layout = QVBoxLayout(self)
+
+         self.gemini_key_label = QLabel("Gemini API Key:")
+         self.gemini_key_input = QLineEdit()
+         self.gemini_key_input.setText(self.config.get_gemini_key())
+         layout.addWidget(self.gemini_key_label)
+         layout.addWidget(self.gemini_key_input)
+
+         self.save_button = QPushButton("Save")
+         self.save_button.clicked.connect(self.save_settings)
+         layout.addWidget(self.save_button)
+
+         self.setLayout(layout)
+
+    def save_settings(self):
+        new_gemini_api_key = self.gemini_key_input.text()
+        if new_gemini_api_key:
+            self.config.update_gemini_key(new_gemini_api_key)
+        self.close()
+
+
+class MainWindow(QWidget):
+    def __init__(self, logger:Logger, command_handler: CommandHandler, config: Config, system_utils:SystemUtils, app_path:str):
+        super().__init__()
+        self.app_path = app_path
+        self.logger = logger
+        self.config = config
+        self.command_handler = command_handler
+        self.system_utils = system_utils
+        self.setWindowTitle("AI Assistant")
+        self.setWindowIcon(QIcon(Path("gui/assets/animated_icon.gif").resolve().as_posix()))
+        self.chat_log = []
+        self.animation_size = 100
+        self.animation_speed = 50
+
+        self.setup_ui()
+        self.is_speaking = False
+        self.speech_handler = SpeechHandler(logger)
+        self.initiate_loop()
+        self.setGeometry(100, 100, 400, 600)
+
+    def setup_ui(self):
+        """Sets up the graphical interface for the main window."""
+        main_layout = QVBoxLayout(self)
+
+        #System Resource Label
+        self.resource_label = QLabel("")
+        main_layout.addWidget(self.resource_label)
+        self.update_resource_label()
+        self.system_timer = QTimer(self)
+        self.system_timer.timeout.connect(self.update_resource_label)
+        self.system_timer.start(5000) # update every 5 seconds
+        # Chat Display
+        self.chat_area = QTextEdit(self)
+        self.chat_area.setReadOnly(True)
+        self.chat_area.setStyleSheet(chat_style)
+        main_layout.addWidget(self.chat_area)
+
+        # User Input Area
+        input_layout = QHBoxLayout()
+        self.user_input = QLineEdit(self)
+        self.user_input.setStyleSheet(input_box_style)
+        self.user_input.returnPressed.connect(self.handle_input)
+        input_layout.addWidget(self.user_input)
+
+        #Speak Button
+        self.speak_button = QPushButton("Speak", self)
+        self.speak_button.clicked.connect(self.voice_command)
+        input_layout.addWidget(self.speak_button)
+
+        main_layout.addLayout(input_layout)
+
+        #Settings Button
+        self.settings_button = QPushButton("Settings", self)
+        self.settings_button.clicked.connect(self.open_settings)
+        main_layout.addWidget(self.settings_button)
+
+
+        self.setLayout(main_layout)
+
+        # Setup GIF Animation
+        self.movie = QMovie(Path("gui/assets/animated_icon.gif").resolve().as_posix())
+        self.movie.setScaledSize(QSize(self.animation_size, self.animation_size))
+        self.animation_label = QLabel()
+        self.animation_label.setMovie(self.movie)
+        self.animation_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.animation_label.hide() #Hide Label initially
+        main_layout.addWidget(self.animation_label)
+
+    def open_settings(self):
+        settings_dialog = SettingsDialog(self.config, self)
+        settings_dialog.exec()
+
+    def update_resource_label(self):
+          cpu_usage = self.system_utils.get_cpu_usage()
+          memory_usage = self.system_utils.get_memory_usage()
+          os_name = self.system_utils.get_os_name()
+          self.resource_label.setText(f"OS: {os_name}  | CPU: {cpu_usage}% | Memory: {memory_usage}%")
+
+    def voice_command(self):
+      self.speak_button.setEnabled(False) # Disable Speak during execution
+      self.show_animation()
+      QApplication.processEvents()  # Allow animation to start immediately
+      self.start_voice_command_async()
+
+    def start_voice_command_async(self):
+         QTimer.singleShot(10, self._handle_voice_command)
+
+    def _handle_voice_command(self):
+        try:
+          command = self.speech_handler.listen()
+          if command:
+               self.handle_command(command)
+        finally:
+          self.speak_button.setEnabled(True) #Enable Button
+          self.hide_animation()
+
+    def handle_input(self):
+          """Handles text input from the QLineEdit."""
+          user_input = self.user_input.text()
+          self.user_input.clear() # Clear the input box
+          self.handle_command(user_input)
+
+
+    def handle_command(self, command):
+        """Processes and displays output"""
+        if command:
+              self.add_to_chat("You", command) # Display what you said
+              self.show_animation()
+              QApplication.processEvents() # allow animation before execution
+              response = self.command_handler.process(command)
+              self.hide_animation()
+
+              if response:
+                  self.add_to_chat("Assistant", response) #Display AI's output
+              else:
+                   self.add_to_chat("Assistant", "I cannot process")
+        else:
+            self.add_to_chat("Assistant", "Didnt understand that")
+
+    def add_to_chat(self, sender, message):
+        formatted_text = f"**{sender}:** {message}<br>"
+        self.chat_log.append(formatted_text)
+        self.chat_area.setText("".join(self.chat_log))
+        self.chat_area.verticalScrollBar().setValue(self.chat_area.verticalScrollBar().maximum()) #Scroll To bottom
+
+    def show_animation(self):
+      self.movie.start()
+      self.animation_label.show()
+      QApplication.processEvents()  # Force to show animation before doing something
+    def hide_animation(self):
+      self.movie.stop()
+      self.animation_label.hide()
+
+    def initiate_loop(self):
+      self.add_to_chat("Assistant", "I'm awake and ready to help you.")
+
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+
+    logger = Logger()
+    config = Config()
+    system_utils = SystemUtils()
+    from core.app_manager import AppManager
+    app_manager = AppManager(logger, config)
+    from core.gemini_handler import GeminiHandler
+    gemini_handler = GeminiHandler(logger,config)
+    from core.command_handler import CommandHandler
+    command_handler = CommandHandler(logger, app_manager, gemini_handler)
+
+
+    main_window = MainWindow(logger, command_handler, config, system_utils, sys.executable)
+    main_window.show()
+    sys.exit(app.exec())
+content_copy
+download
+Use code with caution.
+Python
+
+ai_assistant/main.py
+
+import sys
+import time
+from PyQt6.QtWidgets import QApplication
+from gui.main_window import MainWindow
+from utils.startup import StartupManager
+from utils.logger import Logger
+from core.config import Config
+from core.app_manager import AppManager
+from core.gemini_handler import GeminiHandler
+from core.command_handler import CommandHandler
+from utils.system import SystemUtils
+
+def main():
+    app = QApplication(sys.argv)
+    logger = Logger()
+    config = Config()
+    system_utils = SystemUtils()
+    app_manager = AppManager(logger, config)
+    gemini_handler = GeminiHandler(logger, config)
+    command_handler = CommandHandler(logger, app_manager, gemini_handler)
+    startup_manager = StartupManager(sys.executable, logger) # Get Current Path
+
+    if not startup_manager.is_startup_enabled():
+       #Enable for testing only, Remove for real builds.
+       startup_manager.enable_startup()
+       #Disable for testing only, Remove for real builds.
+       #startup_manager.disable_startup()
+
+    main_window = MainWindow(logger, command_handler, config, system_utils, sys.executable)
+    main_window.show()
+    sys.exit(app.exec())
+
+if __name__ == '__main__':
+   main()
+content_copy
+download
+Use code with caution.
+Python
+
+ai_assistant/README.md
+
+# AI Assistant
+
+This is an AI Assistant application designed to help users interact with their computer through voice and text commands.
+
+## Features
+
+- **Voice and Text Command Execution:** Opens files, folders, and applications based on user voice or text.
+- **Gemini Integration:** Chats with users using Google Gemini.
+- **Startup Functionality:** Optionally starts the application at login.
+- **User Interface:** A user friendly text interface
+- **Logging** Logs application events to a local file for debug purposes
+- **Config Management** Handles api keys and default application configuration
+- **System Monitoring** displays CPU and Memory utilization for better user experince
+
+## Getting Started
+
+1.  **Clone the repository:**
+content_copy
+download
+Use code with caution.
+Markdown
+
+git clone https://your_github_repo/your_repo_name.git
+
+2.  **Navigate to the project directory:**
+    
+   cd your_repo_name
+    
+
+3.  **Create a virtual environment:**
+  bash
+    python -m venv venv
+    
+
+4. **Activate the virtual environment:**
+  bash
+   venv\Scripts\activate #On Windows
+content_copy
+download
+Use code with caution.
+
+Install dependencies:
+
+pip install -r requirements.txt
+content_copy
+download
+Use code with caution.
+
+Run the application:
+
+python main.py
+    ```
+*Configuration*:
+
+1. Create a Google Gemini API key through Google AI Studio.
+2. Replace "Enter_API_Key" with your Gemini API Key in the  user_config.json file under the data/ folder
+3. The program creates a user_config.json file in the data directory if it does not exist.
+4. Modify app_paths section in data/user_config.json to your desired application executable path.
+
+## TODO
+*  Refactor all functions and modules for better modularity and clean code
+*   Add proper unit tests for each module.
+* Add More error handling for user input, and invalid
+content_copy
+download
+Use code with caution.
