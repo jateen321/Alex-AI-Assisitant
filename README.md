@@ -113,14 +113,3 @@ ai_assistant/
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🤝 Contributing
-
-Contributions are welcome!
-
-## 📞 Contact
-
-For any inquiries or issues, please contact [atharva.a.date@gmail.com](mailto:atharva.a.date@gmail.com).
-
----
-
-*Made by [Atharva Date](https://github.com/ADIITJ)*
